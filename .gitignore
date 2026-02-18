@@ -1,0 +1,9 @@
+.DS_Store
+.ddev/.db*
+logs/
+files/original/
+files/large/
+files/medium/
+files/square/
+files/asset/
+files/tmp/

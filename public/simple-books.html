@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Omeka S Books</title>
+    <style>
+      body {
+        font-family: "Georgia", "Times New Roman", serif;
+        margin: 32px;
+        color: #1f1f1f;
+        background: #f6f3ee;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 24px;
+        background: #ffffff;
+        border: 1px solid #e6e0d7;
+        border-radius: 8px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+      }
+      h1 {
+        font-size: 28px;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 20px;
+        color: #5a5247;
+      }
+      #status {
+        margin: 12px 0 20px;
+        font-size: 14px;
+        color: #6b6155;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      li {
+        padding: 12px 0;
+        border-bottom: 1px solid #eee7dd;
+      }
+      li:last-child {
+        border-bottom: none;
+      }
+      .title {
+        font-weight: 600;
+      }
+      .meta {
+        font-size: 14px;
+        color: #6b6155;
+      }
+      .pdf {
+        display: inline-block;
+        margin-top: 6px;
+        font-size: 14px;
+        color: #2f5f4a;
+        text-decoration: none;
+      }
+      .pdf:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Library (Omeka S)</h1>
+      <p>Animal Test</p>
+      <div id="status">Loading items…</div>
+      <ul id="books"></ul>
+    </main>
+
+    <script>
+      const statusEl = document.getElementById("status");
+      const listEl = document.getElementById("books");
+
+      function firstValue(values) {
+        if (!Array.isArray(values) || values.length === 0) return "";
+        const value = values[0];
+        return value["@value"] || value["o:label"] || "";
+      }
+
+      function firstIdentifierUrl(item) {
+        const ids = item["dcterms:identifier"];
+        if (!Array.isArray(ids)) return "";
+        for (const id of ids) {
+          const value = id["@value"];
+          if (typeof value === "string" && value.startsWith("http")) {
+            return value;
+          }
+        }
+        return "";
+      }
+
+      async function resolveMediaUrl(mediaRef) {
+        if (!mediaRef) return "";
+        if (mediaRef["o:original_url"]) return mediaRef["o:original_url"];
+        if (mediaRef["o:source"]) return mediaRef["o:source"];
+        if (!mediaRef["@id"]) return "";
+
+        try {
+          const response = await fetch(mediaRef["@id"], { headers: { Accept: "application/json" } });
+          if (!response.ok) return "";
+          const media = await response.json();
+          return media["o:original_url"] || media["o:source"] || "";
+        } catch (error) {
+          return "";
+        }
+      }
+
+      fetch("/api/items?per_page=50&sort_by=created&sort_order=desc", {
+        headers: { Accept: "application/json" },
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error("API request failed");
+          return response.json();
+        })
+        .then((items) => {
+          listEl.innerHTML = "";
+          if (!items || items.length === 0) {
+            statusEl.textContent = "No items yet. Add a few in the admin UI.";
+            return;
+          }
+
+          statusEl.textContent = `Showing ${items.length} items`;
+
+          items.forEach((item) => {
+            const title = item["o:title"] || firstValue(item["dcterms:title"]) || "Untitled";
+            const creator = firstValue(item["dcterms:creator"]) || "Unknown author";
+            const date = firstValue(item["dcterms:date"]);
+
+            const pdfUrl = firstIdentifierUrl(item);
+            const pdfLabel = pdfUrl ? "Open PDF" : "";
+
+            const li = document.createElement("li");
+            li.innerHTML = `
+              <div class="title">${title}</div>
+              <div class="meta">${creator}${date ? " · " + date : ""}</div>
+              <a class="pdf" href="${pdfUrl || "#"}" target="_blank" rel="noopener" style="${pdfUrl ? "" : "display:none;"}">${pdfLabel}</a>
+            `;
+            listEl.appendChild(li);
+
+            const mediaRefs = item["o:media"];
+            if (Array.isArray(mediaRefs) && mediaRefs.length > 0) {
+              const pdfLink = li.querySelector(".pdf");
+              resolveMediaUrl(mediaRefs[0]).then((mediaUrl) => {
+                if (!mediaUrl || !pdfLink) return;
+                pdfLink.href = mediaUrl;
+                pdfLink.textContent = "Open PDF";
+                pdfLink.style.display = "inline-block";
+              });
+            }
+          });
+        })
+        .catch((error) => {
+          statusEl.textContent = "Could not load items from the API.";
+          console.error(error);
+        });
+    </script>
+  </body>
+</html>
