@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  web:
+    build: .
+    ports:
+      - "8003:80"
+    environment:
+      OMEKA_DB_HOST: db
+      OMEKA_DB_NAME: omekatest
+      OMEKA_DB_USER: omeka
+      OMEKA_DB_PASSWORD: omeka
+    volumes:
+      - files_data:/var/www/html/files
+      - logs_data:/var/www/html/logs
+    depends_on:
+      - db
+
+  db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_DATABASE: omekatest
+      MARIADB_USER: omeka
+      MARIADB_PASSWORD: omeka
+      MARIADB_ROOT_PASSWORD: root
+    volumes:
+      - db_data:/var/lib/mysql
+
+volumes:
+  db_data:
+  files_data:
+  logs_data:
